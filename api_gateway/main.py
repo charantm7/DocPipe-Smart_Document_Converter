@@ -23,5 +23,3 @@ app.include_router(upload_proxy.upload)
 @app.get("/favicon.ico")
 def favicon_point():
     return Response(status_code=status.HTTP_200_OK)
-
-
