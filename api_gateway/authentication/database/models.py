@@ -3,7 +3,7 @@ import enum
 import sqlalchemy
 from .connection import Base
 from uuid import uuid4
-from sqlalchemy import Column, String, Boolean, Integer, UUID, Date, Enum, Text, TIMESTAMP, DateTime
+from sqlalchemy import Column, String, Boolean, Date, Enum, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, CITEXT
 from sqlalchemy.sql import func
 
