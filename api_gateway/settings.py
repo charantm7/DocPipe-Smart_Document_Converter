@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     POSTGRES_URL: str
 
     ACCESS_TOKEN_EXPIRE_MINUTE: int
+    JWT_ALGORITHM: str
+    JWT_SECRETE: str
 
     model_config = SettingsConfigDict(
 

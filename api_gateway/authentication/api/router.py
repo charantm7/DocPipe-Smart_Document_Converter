@@ -3,41 +3,37 @@ from sqlalchemy.orm import Session
 
 from ..database.connection import get_db
 from ..database.models import User, AuthProviders
-from .schema import SignupSchema
+from ..database.repository import UserRepository
+from .schema import SignupSchema, LoginSchema, TokenResponse
+from .security import verify_hash, create_access_token
 
 auth = APIRouter()
 
 
-@auth.get("/login")
+@auth.post("/login", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def login(
-    email: str,
-    password: str,
+    data: LoginSchema,
     db: Session = Depends(get_db)
 ):
+    repo = UserRepository(db=db)
     # query the mail
-    user = db.query(User).filter(User.email == email).one_or_none()
+    user = repo.get_by_email(data.email)
 
     # if not found -> error/ signup /wrong email /user not registered
-    if not user:
+    if not user or not verify_hash(data.password, user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid Credentials")
 
-    # match the password into the database pass,if not match incorrect password
-    if user.password != password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect Password"
-        )
+    access_token = await create_access_token(subject=str(user.id))
 
-    # if password is correct login and genereate access token and refresh token
-
-    return {
-        'message': "loggedIn successfully"
-    }
+    return {'access_token': access_token}
 
 
 @auth.post('/signup')
-async def signup(data: SignupSchema, db: Session = Depends(get_db)):
+async def signup(
+    data: SignupSchema,
+    db: Session = Depends(get_db)
+):
 
     # check if the user registered already
     user = db.query(User).filter(User.email == data.email).one_or_none()

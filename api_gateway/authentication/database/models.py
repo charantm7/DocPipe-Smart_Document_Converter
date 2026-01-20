@@ -3,7 +3,7 @@ import enum
 import sqlalchemy
 from .connection import Base
 from uuid import uuid4
-from sqlalchemy import Column, String, Boolean, Date, Enum, DateTime
+from sqlalchemy import Column, ForeignKey, String, Boolean, Date, Enum, DateTime
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, CITEXT
 from sqlalchemy.sql import func
 
@@ -38,7 +38,7 @@ class User(TimestampMixin, Base):
 
     email = Column(CITEXT, unique=True, index=True, nullable=False)
 
-    password = Column(
+    hashed_password = Column(
         String(255),
         nullable=True,
         comment="bcrypt hash"
@@ -75,4 +75,29 @@ class User(TimestampMixin, Base):
         Boolean,
         nullable=False,
         server_default=sqlalchemy.true()
+    )
+
+
+class RefreshToken(Base):
+    __tablename__ = 'refresh_token'
+
+    id = Column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        unique=True,
+        nullable=False
+    )
+    hashed_refresh_token = Column(String, nullable=False)
+    expire_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False
+    )
+
+    is_revoked = Column(Boolean, default=False)
+
+    user_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete='CASCADE')
     )

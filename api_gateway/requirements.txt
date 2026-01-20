@@ -13,3 +13,4 @@ sqladmin
 pyjwt
 pytz
 redis
+jwt
