@@ -1,5 +1,6 @@
 from typing import Optional
-from pydantic import BaseModel, EmailStr, field_validator
+from zxcvbn import zxcvbn
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 
 
 class TokenResponse(BaseModel):
@@ -19,9 +20,16 @@ class SignupSchema(LoginSchema, BaseModel):
     last_name: Optional[str] = None
     date_of_birth: Optional[str] = None
 
-    @field_validator("confirm_password")
+    @field_validator("password")
     @classmethod
-    def password_match(cls, v, info):
-        if v != info.data.get("password"):
+    def password_strength(cls, password) -> str:
+        score = zxcvbn(password)["score"]
+        if score < 3:
+            raise ValueError("Password is too weak")
+        return password
+
+    @model_validator(mode="after")
+    def password_match(self):
+        if self.confirm_password is not None and self.password != self.confirm_password:
             raise ValueError("Password does not match")
-        return v
+        return self

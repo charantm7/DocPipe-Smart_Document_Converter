@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+import uuid
 import jwt
 from passlib.context import CryptContext
 from datetime import datetime, timezone, timedelta
@@ -7,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from api_gateway.authentication.database.repository import UserRepository
 from api_gateway.settings import settings
 from api_gateway.authentication.database.models import RefreshToken
 
@@ -75,3 +77,44 @@ def create_refersh_token(db: Session, user_id):
     db.commit()
 
     return refresh_token
+
+
+def create_email_verification_token(user_id: uuid.UUID) -> str:
+    payload = {
+        "sub": user_id,
+        "type": "email_verification",
+        "exp": int((datetime.now(timezone.utc) + timedelta(minutes=30)).timestamp())
+    }
+
+    return jwt.encode(payload, settings.JWT_SECRETE, settings.JWT_ALGORITHM)
+
+
+def validate_jwt_token(token: str, db: Session):
+
+    payload = jwt.decode(
+        token,
+        settings.JWT_SECRETE,
+        algorithms=['HS256']
+    )
+
+    if payload.get("type") != "email_verification":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid token"
+        )
+
+    user = UserRepository(db).get_by_id(payload['sub'])
+
+    if not user:
+        HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found"
+        )
+
+    if user.is_verified:
+        return {"message": "Email already verified"}
+
+    user.is_verified = True
+    db.commit()
+
+    return {"message": "Email verified successfully"}

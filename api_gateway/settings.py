@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_SECRETE: str
 
+    FRONTEND_URL: str
+
     model_config = SettingsConfigDict(
 
         env_file=Path(__file__).resolve().parents[0]/".env",

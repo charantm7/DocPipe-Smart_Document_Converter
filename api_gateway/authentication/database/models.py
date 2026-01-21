@@ -70,7 +70,7 @@ class User(TimestampMixin, Base):
         Enum(AuthProviders, name="auth_providers"),
         nullable=False
     )
-    last_loggin_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
 
     is_active = Column(
         Boolean,

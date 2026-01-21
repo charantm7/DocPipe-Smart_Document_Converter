@@ -14,3 +14,4 @@ pyjwt
 pytz
 redis
 jwt
+zxcvbn

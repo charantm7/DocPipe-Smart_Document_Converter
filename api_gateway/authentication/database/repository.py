@@ -1,10 +1,10 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from api_gateway.authentication.database.models import User
+from api_gateway.authentication.database.models import AuthProviders, User
 
 
 class UserRepository:
@@ -28,32 +28,22 @@ class UserRepository:
 
     # Commands
 
-    def create(
-            self,
-            *,
-            email: str,
-            hashed_password: str,
-            first_name: str,
-            last_name: str,
-            date_of_birth: date
-    ) -> User:
-        user = User(
-            email=email,
-            hashed_password=hashed_password,
-            first_name=first_name,
-            last_name=last_name,
-            date_of_birth=date_of_birth
-        )
+    def create(self, **fields) -> User:
+        user = User(**fields)
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)
         return user
 
-    def exist_by_email(self, email: str) -> bool:
+    def exists_by_email(self, email: str) -> bool:
         stmt = select(User.id).where(User.email == email)
         return self.db.execute(stmt).first() is not None
 
-    def update_credentials(
+    def update_last_login(
         self,
-
-    )
+        provider: str,
+        user: User
+    ) -> None:
+        user.last_loggin_at = datetime.now(timezone.utc)
+        user.last_login_provider = provider
+        self.db.commit()
