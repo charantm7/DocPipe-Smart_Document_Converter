@@ -1,3 +1,4 @@
+from re import S
 from smtplib import SMTP_PORT
 from pydantic_settings import BaseSettings,  SettingsConfigDict
 from pathlib import Path
@@ -28,6 +29,12 @@ class Settings(BaseSettings):
     SMTP_PORT: int
     EMAIL_FROM: str
     EMAIL_PASSWORD: str
+
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+
+    GITHUB_CLIENT_ID: str
+    GITHUB_CLIENT_SECRET: str
 
     model_config = SettingsConfigDict(
 

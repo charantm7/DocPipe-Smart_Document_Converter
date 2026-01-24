@@ -1,10 +1,14 @@
 from fastapi import FastAPI, Response, status
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+
+from api_gateway.settings import settings
 
 from .authentication.api.router import auth
 from .routes import (
     upload_proxy
 )
+
 
 app = FastAPI(
     title="DocPipe",
@@ -22,6 +26,11 @@ app.mount(
     "/static",
     StaticFiles(directory="api_gateway/authentication/static"),
     name='static'
+)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.JWT_SECRETE
 )
 
 
