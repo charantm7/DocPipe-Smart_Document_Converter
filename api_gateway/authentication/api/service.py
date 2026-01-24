@@ -8,19 +8,49 @@ from api_gateway.authentication.api.security import (
     create_access_token,
     create_email_verification_token,
     create_password_hash,
+    create_password_reset_token,
     hash_token,
     validate_jwt_token,
     verify_password_hash,
     oauth2_scheme
 )
-from api_gateway.authentication.api.tasks import send_email_verification_link
+from api_gateway.authentication.api.tasks import send_email_verification_link, send_password_reset_link
 from api_gateway.authentication.database.connection import get_db
 from api_gateway.authentication.database.models import AuthProviders, User
 from api_gateway.authentication.database.repository import EmailRepository, UserRepository
-from api_gateway.authentication.api.schema import SignupSchema, LoginSchema
+from api_gateway.authentication.api.schema import SignupSchema, LoginSchema, PasswordResetSchema
 from api_gateway.settings import settings
 
 VERIFICATION_RESEND_COOLDOWN = timedelta(minutes=5)
+PASSWORD_VERIFICATION_RESEND_COOLDOWN = timedelta(minutes=1)
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> User:
+    payload = validate_jwt_token(token)
+
+    try:
+        user_id = uuid.UUID(payload["sub"])
+    except (KeyError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+    user = UserRepository(db).get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    if getattr(user, "is_active", True) is False:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+    return user
 
 
 class AuthService:
@@ -47,6 +77,7 @@ class AuthService:
             self.email_service.create_and_send_email_verification,
             user
         )
+        self.repo.update_email_verification_sent_at(user)
         return self._issue_token(user)
 
     def login(self, data: LoginSchema) -> str:
@@ -59,6 +90,75 @@ class AuthService:
             user=user
         )
         return self._issue_token(user)
+
+    def create_and_send_password_reset_link(self, email: str):
+
+        user = self.repo.get_by_email(email)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+
+        now = datetime.now(timezone.utc)
+
+        if (
+            user.password_reset_sent_at and now -
+                user.password_reset_sent_at < PASSWORD_VERIFICATION_RESEND_COOLDOWN
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Please wait before requesting another Password reset link",
+            )
+
+        # create token
+        token = create_password_reset_token()
+        # hash token
+        hashed_token = hash_token(token)
+        # add to db
+
+        self.repo.create_password_reset_record(
+            hashed_token=hashed_token,
+            user_id=user.id,
+            expires_at=(datetime.now(
+                timezone.utc) + timedelta(minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTE))
+        )
+
+        reset_link = (
+            f"{settings.REDIRECT_URL}/reset-password?token={token}"
+        )
+
+        send_password_reset_link(reset_link, email)
+        self.repo.update_password_reset_link_sent_at(user)
+        return f"Reset Link sent to {email} successfully"
+
+    def reset_password_from_token(
+        self,
+        token: str,
+        data: PasswordResetSchema
+    ):
+        hashed_token = hash_token(token)
+
+        token_record = self.repo.is_password_reset_token_exists(hashed_token)
+
+        if not token_record or token_record.used:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Link"
+            )
+
+        if token_record.expires_at < datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Link Expired"
+            )
+        user = self.repo.get_by_id(token_record.user_id)
+        hashed_new_password = create_password_hash(data.new_password)
+        self.repo.update_password(user, hashed_new_password)
+        self.repo.update_password_reseted_at(user)
+        self.repo.update_password_reset_token_status(token_record)
+
+        return "password reset successful"
 
     # Internal helpers
 
@@ -99,44 +199,10 @@ class AuthService:
             )
 
 
-class UserService:
-    def __init__(self, db=None):
-        self.db = db
-
-    def get_current_user(
-        self,
-        token: str = Depends(oauth2_scheme),
-        db: Session = Depends(get_db)
-    ) -> User:
-        payload = validate_jwt_token(token)
-
-        try:
-            user_id = uuid.UUID(payload["sub"])
-        except (KeyError, ValueError):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload",
-            )
-        user = UserRepository(db).get_by_id(user_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-            )
-
-        if getattr(user, "is_active", True) is False:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account is inactive",
-            )
-        return user
-
-
 class EmailService:
     def __init__(self, db):
         self.user_repo = UserRepository(db)
         self.email_repo = EmailRepository(db)
-        self.email_service = EmailService(db)
 
     def create_and_send_email_verification(self, user: User) -> None:
         token = create_email_verification_token()
@@ -175,9 +241,12 @@ class EmailService:
 
         return {"message": "Email Verification Successful"}
 
-    def resend_verification_link(self, user: User, backround_task: BackgroundTasks) -> None:
+    def resend_verification_link(self, user: User, backround_task: BackgroundTasks) -> str:
         if user.is_email_verified:
-            return
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already verified"
+            )
 
         now = datetime.now(timezone.utc)
 
@@ -191,12 +260,13 @@ class EmailService:
             )
 
         backround_task.add_task(
-            self.email_service.create_and_send_email_verification,
+            self.create_and_send_email_verification,
             user
         )
 
         self.user_repo.update_email_verification_sent_at(user)
 
+        return "Email sent successfully"
         # Internal helpers
 
     def _issue_hashed_token(self, token: str) -> str:

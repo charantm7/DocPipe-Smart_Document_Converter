@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from api_gateway.authentication.database.models import AuthProviders, User, EmailVerificationToken
+from api_gateway.authentication.database.models import AuthProviders, User, EmailVerificationToken, PasswordResetToken
 
 
 class UserRepository:
@@ -50,16 +50,44 @@ class UserRepository:
 
     def update_email_verification_status(self, user_id: uuid.UUID) -> None:
         user = self.get_by_id(user_id)
-        user.is_verified = True
+        user.is_email_verified = True
         self.db.commit()
 
     def update_email_verification_sent_at(self, user: User) -> None:
-        user.email_verification_sent_at = datetime.now(timezone=True)
+        user.email_verification_sent_at = datetime.now(timezone.utc)
         self.db.commit()
 
     def update_email_verified_at(self, user_id: uuid.UUID) -> None:
         user = self.get_by_id(user_id)
-        user.email_verified_at = datetime.now(timezone=True)
+        user.email_verified_at = datetime.now(timezone.utc)
+        self.db.commit()
+
+    def update_password(self, user: User, hashed_password: str) -> None:
+        user.hashed_password = hashed_password
+        self.db.commit()
+
+    def update_password_reset_link_sent_at(self, user: User) -> None:
+        user.password_reset_sent_at = datetime.now(timezone.utc)
+        self.db.commit()
+
+    def update_password_reseted_at(self, user: User) -> None:
+        user.password_reseted_at = datetime.now(timezone.utc)
+        self.db.commit()
+
+    # Password Token record
+
+    def create_password_reset_record(self, **fields) -> None:
+        record = PasswordResetToken(**fields)
+        self.db.add(record)
+        self.db.commit()
+
+    def is_password_reset_token_exists(self, token: str) -> PasswordResetToken:
+        stmt = select(PasswordResetToken).where(
+            PasswordResetToken.hashed_token == token)
+        return self.db.execute(stmt).scalar_one_or_none()
+
+    def update_password_reset_token_status(self, token_record: PasswordResetToken) -> None:
+        token_record.used = True
         self.db.commit()
 
 

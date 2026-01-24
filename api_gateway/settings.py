@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     REDIRECT_URL: str
 
     EMAIL_VERIFICATION_TOKEN_EXPIRE_MINUTE: int
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTE: int
 
     SMTP_HOST: str
     SMTP_PORT: int

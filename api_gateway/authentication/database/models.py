@@ -68,6 +68,16 @@ class User(TimestampMixin, Base):
         nullable=True
     )
 
+    password_reset_sent_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    password_reseted_at = Column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
     primary_provider = Column(
         Enum(AuthProviders,
              name="auth_providers"
@@ -116,6 +126,18 @@ class RefreshToken(Base):
 
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True,
+                unique=True, nullable=False, default=uuid4)
+    hashed_token = Column(String, nullable=False, index=True, unique=True)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey(
+        "users.id", ondelete="CASCADE"))
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, default=False)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True,
                 unique=True, nullable=False, default=uuid4)

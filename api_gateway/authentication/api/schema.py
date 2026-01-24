@@ -13,6 +13,29 @@ class LoginSchema(BaseModel):
     password: Optional[str] = None
 
 
+class PasswordResetRequestSchema(BaseModel):
+    email: Optional[EmailStr] = None
+
+
+class PasswordResetSchema(BaseModel):
+    new_password: str
+    confirm_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strength(cls, new_password) -> str:
+        score = zxcvbn(new_password)["score"]
+        if score < 3:
+            raise ValueError("Password is too weak")
+        return new_password
+
+    @model_validator(mode='after')
+    def reset_password_match(self):
+        if self.confirm_password is not None and self.new_password != self.confirm_password:
+            raise ValueError("Password must match")
+        return self
+
+
 class SignupSchema(LoginSchema, BaseModel):
 
     confirm_password: Optional[str] = None

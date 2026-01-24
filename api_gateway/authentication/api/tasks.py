@@ -30,3 +30,29 @@ def send_email_verification_link(link: str, to_email: str) -> None:
         print("Auth error", str(e))
     except Exception as e:
         print("Exception", str(e))
+
+
+def send_password_reset_link(link: str, to_email: str) -> None:
+    subject = "Reset Your DocConvert Password"
+
+    html = render_email_template(
+        "password_reset.html",
+        context={"reset_password_link": link}
+    )
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = settings.EMAIL_FROM
+    message["To"] = to_email
+    message.attach(MIMEText(html, "html"))
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(settings.EMAIL_FROM, settings.EMAIL_PASSWORD)
+            server.send_message(message)
+
+    except smtplib.SMTPAuthenticationError as e:
+        print("Auth error", str(e))
+    except Exception as e:
+        print("Exception", str(e))
