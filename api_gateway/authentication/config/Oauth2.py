@@ -25,4 +25,3 @@ oauth.register(
     client_kwargs={
         'scope': 'user:email read:user',
     },
-)
