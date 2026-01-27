@@ -30,7 +30,9 @@ app.mount(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.JWT_SECRETE
+    secret_key=settings.JWT_SECRETE,
+    same_site="lax",
+    https_only=False,
 )
 
 

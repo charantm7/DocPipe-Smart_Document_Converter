@@ -25,3 +25,17 @@ oauth.register(
     client_kwargs={
         'scope': 'user:email read:user',
     },
+)
+
+oauth.register(
+    name="twitter",
+    client_id=settings.X_CLIENT_ID,
+    client_secret=settings.X_CLIENT_SECRET,
+    authorize_url="https://twitter.com/i/oauth2/authorize",
+    access_token_url="https://api.x.com/2/oauth2/token",
+    redirect_uri="http://docconvert.local:8000/twitter/callback",
+    client_kwargs={
+        "scope": "users.read tweet.read offline.access",
+        "code_challenge_method": "S256",
+    },
+)

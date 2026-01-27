@@ -160,3 +160,25 @@ async def github_callback(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@auth.get("/twitter/login")
+async def twitter_login(request: Request):
+    return await Oauth2.oauth.twitter.authorize_redirect(
+        request,
+        "http://docconvert.local:8000/twitter/callback",
+    )
+
+
+@auth.get("/twitter/callback")
+async def twitter_callback(request: Request):
+    try:
+        token = await Oauth2.oauth.twitter.authorize_access_token(request)
+        user = await Oauth2.oauth.twitter.get(
+            "https://api.x.com/2/users/me",
+            token=token,
+            params={"user.fields": "id,name,username,profile_image_url"}
+        )
+        return user.json()
+    except Exception as e:
+        return str(e)

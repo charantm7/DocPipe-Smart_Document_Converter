@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str
     GITHUB_CLIENT_SECRET: str
 
+    X_CLIENT_ID: str
+    X_CLIENT_SECRET: str
+
     model_config = SettingsConfigDict(
 
         env_file=Path(__file__).resolve().parents[0]/".env",
