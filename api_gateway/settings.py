@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     X_CLIENT_ID: str
     X_CLIENT_SECRET: str
 
+    GOOGLE_CALLBACK_REDIRECT_LINK: str
+    GITHUB_CALLBACK_REDIRECT_LINK: str
+    X_CALLBACK_REDIRECT_LINK: str
+
     model_config = SettingsConfigDict(
 
         env_file=Path(__file__).resolve().parents[0]/".env",
